@@ -5,7 +5,7 @@ const elements = {
   jobCount: document.querySelector("#jobCount"),
   jobTable: document.querySelector("#jobTable"),
   refreshButton: document.querySelector("#refreshButton"),
-  saveImageModelButton: document.querySelector("#saveImageModelButton"),
+  saveModelsButton: document.querySelector("#saveModelsButton"),
   saveTtsModelButton: document.querySelector("#saveTtsModelButton"),
   savePromptsButton: document.querySelector("#savePromptsButton"),
   saveContentModulesButton: document.querySelector("#saveContentModulesButton"),
@@ -25,7 +25,7 @@ document.querySelectorAll("[data-admin-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.adminTab));
 });
 elements.refreshButton.addEventListener("click", loadAdminState);
-elements.saveImageModelButton.addEventListener("click", saveImageModel);
+elements.saveModelsButton.addEventListener("click", saveModelsConfig);
 elements.saveTtsModelButton.addEventListener("click", saveTtsModel);
 elements.savePromptsButton.addEventListener("click", savePrompts);
 elements.saveContentModulesButton.addEventListener("click", saveContentModules);
@@ -83,6 +83,7 @@ function renderQueue(data) {
 }
 
 function renderSettings(nextSettings) {
+  fillModelFields("llm", nextSettings.models.llm);
   fillModelFields("image", nextSettings.models.image);
   fillModelFields("tts", nextSettings.models.tts);
   document.querySelector("#ttsCloneEnabled").checked = Boolean(nextSettings.models.tts.cloneEnabled);
@@ -218,9 +219,9 @@ function renderVoices(voices, defaultVoiceId) {
     .join("");
 }
 
-async function saveImageModel() {
+async function saveModelsConfig() {
   clearMessage();
-  await saveModels({ image: readImageFields() }, "图片大模型已保存。");
+  await saveModels({ llm: readLlmFields(), image: readImageFields() }, "大模型配置已保存。");
 }
 
 async function saveTtsModel() {
@@ -251,6 +252,7 @@ async function testModel(kind) {
       body: JSON.stringify({
         kind,
         models: {
+          llm: readLlmFields(),
           image: readImageFields(),
           tts: readTtsFields()
         }
@@ -269,6 +271,12 @@ function readModelFields(prefix) {
     baseUrl: document.querySelector(`#${prefix}BaseUrl`).value.trim(),
     apiKey: document.querySelector(`#${prefix}ApiKey`).value.trim(),
     model: document.querySelector(`#${prefix}Model`).value.trim()
+  };
+}
+
+function readLlmFields() {
+  return {
+    ...readModelFields("llm")
   };
 }
 
