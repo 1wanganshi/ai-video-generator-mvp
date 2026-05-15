@@ -5,7 +5,15 @@ import { fileURLToPath } from "node:url";
 import { templates } from "./templates.js";
 import { createJob, getJob, getQueueStatus, listJobs, loadPersistedJobs } from "./jobs.js";
 import { ensureStorage } from "./storage.js";
-import { addClonedVoice, getSettings, loadSettings, setDefaultVoice, updateModels, updatePrompts } from "./settings.js";
+import {
+  addClonedVoice,
+  getSettings,
+  loadSettings,
+  setDefaultVoice,
+  updateContentModules,
+  updateModels,
+  updatePrompts
+} from "./settings.js";
 import { testModelConnection } from "./llm.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +31,11 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/templates") {
       return sendJson(response, { templates });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/content-module") {
+      const settings = await getSettings();
+      return sendJson(response, toPublicContentModuleSettings(settings));
     }
 
     if (request.method === "GET" && url.pathname === "/api/health") {
@@ -71,6 +84,11 @@ const server = http.createServer(async (request, response) => {
       return sendJson(response, toAdminSettings(await updatePrompts(payload)));
     }
 
+    if (request.method === "PUT" && url.pathname === "/api/admin/content-modules") {
+      const payload = JSON.parse((await readBody(request, 2 * 1024 * 1024)) || "{}");
+      return sendJson(response, toAdminSettings(await updateContentModules(payload)));
+    }
+
     if (request.method === "PUT" && url.pathname === "/api/admin/voices/default") {
       const payload = JSON.parse((await readBody(request, 128 * 1024)) || "{}");
       return sendJson(response, toAdminSettings(await setDefaultVoice(String(payload.voiceId ?? ""))));
@@ -103,7 +121,8 @@ const server = http.createServer(async (request, response) => {
       const body = await readBody(request, 512 * 1024);
       const payload = JSON.parse(body || "{}");
       const text = String(payload.text ?? "").trim();
-      const templateId = String(payload.templateId ?? "zen");
+      const templateId = payload.templateId ? String(payload.templateId) : null;
+      const contentModuleId = payload.contentModuleId ? String(payload.contentModuleId) : null;
 
       if (text.length < 6) {
         return sendJson(response, { error: "请输入至少 6 个字的文本内容。" }, 400);
@@ -113,7 +132,7 @@ const server = http.createServer(async (request, response) => {
         return sendJson(response, { error: "MVP 暂时限制文本在 2400 字以内。" }, 400);
       }
 
-      const job = await createJob({ text, templateId });
+      const job = await createJob({ text, templateId, contentModuleId });
       return sendJson(response, { jobId: job.id, job }, 202);
     }
 
@@ -267,6 +286,32 @@ function toAdminSettings(settings) {
       ])
     ),
     voices: settings.voices.map(toAdminVoice)
+  };
+}
+
+function toPublicContentModuleSettings(settings) {
+  const modules = (settings.contentModules ?? []).filter((module) => module.enabled).map(toPublicContentModule);
+  const activeModule =
+    modules.find((module) => module.id === settings.activeContentModuleId) ??
+    modules[0] ??
+    null;
+
+  return {
+    activeModuleId: activeModule?.id ?? null,
+    activeModule,
+    modules
+  };
+}
+
+function toPublicContentModule(module) {
+  return {
+    id: module.id,
+    name: module.name,
+    description: module.description,
+    templateId: module.templateId,
+    frontTitle: module.frontTitle,
+    frontSubtitle: module.frontSubtitle,
+    defaultText: module.defaultText
   };
 }
 

@@ -12,7 +12,8 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">AI Video Generator</p>
-            <h1>文字生成分镜视频</h1>
+            <h1 id="moduleTitle">文字生成分镜视频</h1>
+            <p class="top-subtitle" id="moduleSubtitle">选择后台配置的短视频模块，自动匹配内容方向、提示词和画风。</p>
           </div>
           <div class="top-actions">
             <a class="ghost-link" href="/admin.html">后台任务</a>
@@ -22,6 +23,14 @@
 
         <div class="layout">
           <section class="panel editor-panel" aria-label="生成设置">
+            <div class="field">
+              <div class="label-row">
+                <label>内容模块</label>
+                <span id="moduleCount">加载中</span>
+              </div>
+              <div class="content-module-tabs" id="moduleTabs"></div>
+            </div>
+
             <div class="field">
               <label for="scriptText">输入文字</label>
               <textarea id="scriptText" maxlength="2400">真正的改变，不是突然发生的。

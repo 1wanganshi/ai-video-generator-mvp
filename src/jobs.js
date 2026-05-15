@@ -66,9 +66,12 @@ export async function loadPersistedJobs() {
   }
 }
 
-export async function createJob({ text, templateId }) {
+export async function createJob({ text, templateId, contentModuleId }) {
   const id = crypto.randomUUID();
-  const template = getTemplate(templateId);
+  const settings = await getSettings();
+  const contentModule = resolveContentModule(settings, contentModuleId);
+  const resolvedTemplateId = templateId || contentModule?.templateId || "zen";
+  const template = getTemplate(resolvedTemplateId);
   await createJobDirectory(id);
 
   const now = new Date().toISOString();
@@ -81,6 +84,7 @@ export async function createJob({ text, templateId }) {
     queuePosition: queue.length + 1,
     templateId: template.id,
     templateName: template.name,
+    contentModule: contentModule ? toJobContentModule(contentModule) : null,
     scenes: [],
     analysis: null,
     tts: null,
@@ -108,6 +112,7 @@ export async function createJob({ text, templateId }) {
     id,
     text,
     template,
+    contentModule,
     ...paths
   });
   refreshQueuePositions();
@@ -168,7 +173,7 @@ function processQueue() {
     });
 }
 
-async function runJob({ id, text, template, jobDir, publicJobDir }) {
+async function runJob({ id, text, template, contentModule, jobDir, publicJobDir }) {
   const job = jobs.get(id);
   if (!job) {
     return;
@@ -190,7 +195,8 @@ async function runJob({ id, text, template, jobDir, publicJobDir }) {
     });
 
     const settings = await getSettings();
-    const analysisResult = await analyzeStoryboard({ text, template, settings });
+    const currentContentModule = contentModule ?? resolveContentModule(settings);
+    const analysisResult = await analyzeStoryboard({ text, template, settings, contentModule: currentContentModule });
     const scenes = analysisResult.scenes;
     if (!scenes.length) {
       throw new Error("文本内容为空，无法生成分镜。");
@@ -198,12 +204,14 @@ async function runJob({ id, text, template, jobDir, publicJobDir }) {
 
     await writeJson(path.join(jobDir, "storyboard.json"), {
       template,
+      contentModule: currentContentModule ? toJobContentModule(currentContentModule) : null,
       analysis: analysisResult.analysis,
       scenes
     });
     await updateJob(job, {
       scenes,
       analysis: analysisResult.analysis,
+      contentModule: currentContentModule ? toJobContentModule(currentContentModule) : null,
       progress: 22,
       modelSnapshot: {
         llm: {
@@ -225,7 +233,13 @@ async function runJob({ id, text, template, jobDir, publicJobDir }) {
         prompts: settings.prompts.map((prompt) => ({
           id: prompt.id,
           updatedAt: prompt.updatedAt
-        }))
+        })),
+        contentModule: currentContentModule
+          ? {
+              id: currentContentModule.id,
+              updatedAt: currentContentModule.updatedAt
+            }
+          : null
       }
     });
 
@@ -242,7 +256,8 @@ async function runJob({ id, text, template, jobDir, publicJobDir }) {
         scene: scenes[index],
         template,
         outputPath: imagePath,
-        settings
+        settings,
+        contentModule: currentContentModule
       });
 
       imagePaths.push(imagePath);
@@ -340,6 +355,25 @@ function refreshQueuePositions() {
       job.updatedAt = new Date().toISOString();
     }
   });
+}
+
+function resolveContentModule(settings, moduleId = null) {
+  const enabledModules = (settings.contentModules ?? []).filter((module) => module.enabled);
+  return (
+    enabledModules.find((module) => module.id === moduleId) ??
+    enabledModules.find((module) => module.id === settings.activeContentModuleId) ??
+    enabledModules[0] ??
+    null
+  );
+}
+
+function toJobContentModule(module) {
+  return {
+    id: module.id,
+    name: module.name,
+    templateId: module.templateId,
+    frontTitle: module.frontTitle
+  };
 }
 
 async function persistJobSnapshot(job) {

@@ -8,6 +8,9 @@ const elements = {
   saveImageModelButton: document.querySelector("#saveImageModelButton"),
   saveTtsModelButton: document.querySelector("#saveTtsModelButton"),
   savePromptsButton: document.querySelector("#savePromptsButton"),
+  saveContentModulesButton: document.querySelector("#saveContentModulesButton"),
+  addContentModuleButton: document.querySelector("#addContentModuleButton"),
+  contentModuleList: document.querySelector("#contentModuleList"),
   promptList: document.querySelector("#promptList"),
   defaultVoiceSelect: document.querySelector("#defaultVoiceSelect"),
   setDefaultVoiceButton: document.querySelector("#setDefaultVoiceButton"),
@@ -25,6 +28,8 @@ elements.refreshButton.addEventListener("click", loadAdminState);
 elements.saveImageModelButton.addEventListener("click", saveImageModel);
 elements.saveTtsModelButton.addEventListener("click", saveTtsModel);
 elements.savePromptsButton.addEventListener("click", savePrompts);
+elements.saveContentModulesButton.addEventListener("click", saveContentModules);
+elements.addContentModuleButton.addEventListener("click", addContentModule);
 elements.setDefaultVoiceButton.addEventListener("click", setDefaultVoice);
 elements.voiceCloneForm.addEventListener("submit", uploadVoiceClone);
 document.querySelectorAll("[data-test-model]").forEach((button) => {
@@ -81,6 +86,7 @@ function renderSettings(nextSettings) {
   fillModelFields("image", nextSettings.models.image);
   fillModelFields("tts", nextSettings.models.tts);
   document.querySelector("#ttsCloneEnabled").checked = Boolean(nextSettings.models.tts.cloneEnabled);
+  renderContentModules(nextSettings.contentModules ?? [], nextSettings.activeContentModuleId);
   renderPrompts(nextSettings.prompts ?? []);
   renderVoices(nextSettings.voices ?? [], nextSettings.models.tts.defaultVoiceId);
 }
@@ -115,6 +121,77 @@ function renderPrompts(prompts) {
           <textarea class="prompt-textarea" data-prompt-id="${escapeHtml(prompt.id)}">${escapeHtml(prompt.prompt || "")}</textarea>
         </article>
       `
+    )
+    .join("");
+}
+
+function renderContentModules(modules, activeModuleId) {
+  elements.contentModuleList.innerHTML = modules
+    .map(
+      (module) => `
+        <article class="content-module-card" data-content-module-id="${escapeHtml(module.id)}">
+          <div class="content-module-head">
+            <label class="radio-row">
+              <input name="activeContentModule" type="radio" value="${escapeHtml(module.id)}" ${module.id === activeModuleId ? "checked" : ""} />
+              前台展示
+            </label>
+            <label class="check-row"><input class="module-enabled" type="checkbox" ${module.enabled ? "checked" : ""} /> 启用</label>
+          </div>
+          <div class="module-fields">
+            <label>模块 ID<input class="module-id" type="text" value="${escapeHtml(module.id)}" readonly /></label>
+            <label>模块名称<input class="module-name" type="text" value="${escapeHtml(module.name || "")}" /></label>
+            <label>关联风格模板
+              <select class="module-template">
+                ${templateOptions(module.templateId)}
+              </select>
+            </label>
+            <label>前台标题<input class="module-front-title" type="text" value="${escapeHtml(module.frontTitle || "")}" /></label>
+            <label class="wide">前台副标题<input class="module-front-subtitle" type="text" value="${escapeHtml(module.frontSubtitle || "")}" /></label>
+            <label class="wide">后台说明<input class="module-description" type="text" value="${escapeHtml(module.description || "")}" /></label>
+            <label class="wide">前台默认文案<textarea class="module-default-text">${escapeHtml(module.defaultText || "")}</textarea></label>
+            <label class="wide">模块提示词<textarea class="module-prompt">${escapeHtml(module.prompt || "")}</textarea></label>
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function addContentModule() {
+  clearMessage();
+  const id = `module_${Date.now().toString(36)}`;
+  const now = new Date().toISOString();
+  settings.contentModules = [
+    ...(settings.contentModules ?? []),
+    {
+      id,
+      name: "新模块",
+      enabled: true,
+      templateId: "zen",
+      frontTitle: "新模块短视频",
+      frontSubtitle: "在这里配置前台展示文案。",
+      description: "自定义短视频内容方向。",
+      defaultText: "把这里改成前台默认展示的短视频文案。",
+      prompt: "内容模块：新模块。请描述这个模块的内容逻辑、语言风格、画面意象和字幕风格。",
+      updatedAt: now
+    }
+  ];
+  settings.activeContentModuleId = id;
+  renderContentModules(settings.contentModules, settings.activeContentModuleId);
+  showMessage("已新增模块，编辑后点击保存。", false);
+}
+
+function templateOptions(selectedTemplateId) {
+  const templates = [
+    ["zen", "禅宗型"],
+    ["mao", "毛选型"],
+    ["tech", "科技感"],
+    ["guofeng", "国风"]
+  ];
+
+  return templates
+    .map(
+      ([id, name]) => `<option value="${id}" ${id === selectedTemplateId ? "selected" : ""}>${name}</option>`
     )
     .join("");
 }
@@ -247,6 +324,34 @@ async function savePrompts() {
   }
 }
 
+async function saveContentModules() {
+  clearMessage();
+  const modules = [...document.querySelectorAll(".content-module-card")].map((card) => ({
+    id: card.querySelector(".module-id").value.trim(),
+    enabled: card.querySelector(".module-enabled").checked,
+    name: card.querySelector(".module-name").value.trim(),
+    templateId: card.querySelector(".module-template").value,
+    frontTitle: card.querySelector(".module-front-title").value.trim(),
+    frontSubtitle: card.querySelector(".module-front-subtitle").value.trim(),
+    description: card.querySelector(".module-description").value.trim(),
+    defaultText: card.querySelector(".module-default-text").value.trim(),
+    prompt: card.querySelector(".module-prompt").value.trim()
+  }));
+  const activeModuleId = document.querySelector('input[name="activeContentModule"]:checked')?.value;
+
+  try {
+    settings = await fetchJson("/api/admin/content-modules", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ activeModuleId, modules })
+    });
+    renderSettings(settings);
+    showMessage("短视频模块已保存，前台会按当前模块展示。", false);
+  } catch (error) {
+    showMessage(error.message);
+  }
+}
+
 async function setDefaultVoice() {
   clearMessage();
   try {
@@ -292,7 +397,7 @@ function renderJobs(jobs) {
   elements.jobTable.innerHTML = `
     <div class="job-row job-head">
       <span>任务</span>
-      <span>模板</span>
+      <span>模块 / 模板</span>
       <span>阶段</span>
       <span>分析</span>
       <span>进度</span>
@@ -306,7 +411,10 @@ function renderJobs(jobs) {
               <strong>${shortId(job.id)}</strong>
               <small>${formatTime(job.createdAt)}</small>
             </span>
-            <span>${escapeHtml(job.templateName || job.templateId)}</span>
+            <span>
+              <strong>${escapeHtml(job.contentModule?.name || "通用")}</strong>
+              <small>${escapeHtml(job.templateName || job.templateId)}</small>
+            </span>
             <span>
               <b class="badge ${job.status}">${statusText(job.status)}</b>
               <small>${escapeHtml(job.stage || "")}</small>

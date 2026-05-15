@@ -1,11 +1,17 @@
 const state = {
   templates: [],
+  contentModules: [],
+  selectedContentModuleId: null,
   selectedTemplateId: "zen",
   currentJobId: null,
   pollTimer: null
 };
 
 const elements = {
+  moduleTitle: document.querySelector("#moduleTitle"),
+  moduleSubtitle: document.querySelector("#moduleSubtitle"),
+  moduleCount: document.querySelector("#moduleCount"),
+  moduleTabs: document.querySelector("#moduleTabs"),
   scriptText: document.querySelector("#scriptText"),
   charCount: document.querySelector("#charCount"),
   templateCount: document.querySelector("#templateCount"),
@@ -38,7 +44,7 @@ async function init() {
   bindEvents();
   updateCharCount();
   renderTimeline("等待任务");
-  await loadTemplates();
+  await Promise.all([loadTemplates(), loadContentModules()]);
 }
 
 function bindEvents() {
@@ -55,6 +61,21 @@ async function loadTemplates() {
   } catch (error) {
     showError(error.message);
     elements.templateCount.textContent = "加载失败";
+  }
+}
+
+async function loadContentModules() {
+  try {
+    const data = await fetchJson("/api/content-module");
+    state.contentModules = data.modules ?? [];
+    state.selectedContentModuleId = data.activeModuleId ?? state.contentModules[0]?.id ?? null;
+    elements.moduleCount.textContent = `${state.contentModules.length} 个模块`;
+    applySelectedContentModule({ replaceText: true });
+    renderContentModules();
+    renderTemplates();
+  } catch (error) {
+    showError(error.message);
+    elements.moduleCount.textContent = "加载失败";
   }
 }
 
@@ -84,6 +105,44 @@ function renderTemplates() {
   }
 }
 
+function renderContentModules() {
+  elements.moduleTabs.innerHTML = "";
+
+  for (const module of state.contentModules) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "content-module-tab";
+    button.setAttribute("aria-pressed", String(module.id === state.selectedContentModuleId));
+    button.innerHTML = `
+      <strong>${escapeHtml(module.name)}</strong>
+      <span>${escapeHtml(module.description || module.frontSubtitle || "")}</span>
+    `;
+    button.addEventListener("click", () => {
+      state.selectedContentModuleId = module.id;
+      applySelectedContentModule({ replaceText: true });
+      renderContentModules();
+      renderTemplates();
+    });
+    elements.moduleTabs.append(button);
+  }
+}
+
+function applySelectedContentModule({ replaceText = false } = {}) {
+  const module = getSelectedContentModule();
+  if (!module) {
+    return;
+  }
+
+  elements.moduleTitle.textContent = module.frontTitle || module.name || "文字生成分镜视频";
+  elements.moduleSubtitle.textContent = module.frontSubtitle || module.description || "";
+  state.selectedTemplateId = module.templateId || state.selectedTemplateId;
+
+  if (replaceText && module.defaultText) {
+    elements.scriptText.value = module.defaultText;
+    updateCharCount();
+  }
+}
+
 async function submitJob() {
   clearError();
   const text = elements.scriptText.value.trim();
@@ -103,7 +162,8 @@ async function submitJob() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         text,
-        templateId: state.selectedTemplateId
+        templateId: state.selectedTemplateId,
+        contentModuleId: state.selectedContentModuleId
       })
     });
 
@@ -203,6 +263,10 @@ function resetPreview() {
 
 function updateCharCount() {
   elements.charCount.textContent = `${elements.scriptText.value.length} / 2400`;
+}
+
+function getSelectedContentModule() {
+  return state.contentModules.find((module) => module.id === state.selectedContentModuleId) ?? null;
 }
 
 function setBusy(isBusy) {

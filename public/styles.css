@@ -99,6 +99,13 @@ h2 {
   gap: 10px;
 }
 
+.top-subtitle {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .ghost-link,
 .small-button {
   border: 1px solid var(--line);
@@ -191,6 +198,13 @@ label {
   gap: 12px;
 }
 
+.section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .label-row span,
 .field-meta,
 .hint {
@@ -250,6 +264,42 @@ input[type="file"] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.content-module-tabs {
+  display: grid;
+  gap: 10px;
+}
+
+.content-module-tab {
+  min-height: 76px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf7;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.content-module-tab[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(184, 50, 42, 0.18);
+}
+
+.content-module-tab strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.content-module-tab span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .template-card {
@@ -510,9 +560,63 @@ video.ready {
   font-weight: 700;
 }
 
-.check-row input {
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.check-row input,
+.radio-row input {
   width: 16px;
   height: 16px;
+}
+
+.content-module-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.content-module-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fffdf7;
+}
+
+.content-module-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.module-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.module-fields label {
+  margin: 0;
+  font-size: 13px;
+}
+
+.module-fields label.wide {
+  grid-column: 1 / -1;
+}
+
+.module-fields input,
+.module-fields select,
+.module-fields textarea {
+  margin-top: 6px;
+}
+
+.module-fields textarea {
+  min-height: 118px;
 }
 
 .prompt-list {
@@ -710,6 +814,7 @@ video.ready {
 
   .layout,
   .template-grid,
+  .module-fields,
   .admin-grid,
   .model-grid,
   .model-grid.two-columns,

@@ -4,17 +4,19 @@ import { testImage2 } from "./image2.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
-export async function analyzeStoryboard({ text, template, settings }) {
-  const prompt = getPrompt(settings, "storyboard");
+export async function analyzeStoryboard({ text, template, settings, contentModule = null }) {
+  const prompt = buildStoryboardPrompt(settings, contentModule);
   const llm = settings.models.llm;
 
   if (!llm.enabled) {
     return {
-      scenes: createStoryboard(text, template),
+      scenes: attachContentModuleToScenes(createStoryboard(text, template), contentModule),
       analysis: {
         source: "local",
         reason: "llm-disabled",
-        promptId: "storyboard"
+        promptId: "storyboard",
+        contentModuleId: contentModule?.id ?? null,
+        contentModuleName: contentModule?.name ?? null
       }
     };
   }
@@ -24,6 +26,7 @@ export async function analyzeStoryboard({ text, template, settings }) {
       text,
       template,
       prompt,
+      contentModule,
       modelConfig: llm
     });
 
@@ -33,17 +36,21 @@ export async function analyzeStoryboard({ text, template, settings }) {
         source: "llm",
         provider: llm.provider,
         model: llm.model,
-        promptId: "storyboard"
+        promptId: "storyboard",
+        contentModuleId: contentModule?.id ?? null,
+        contentModuleName: contentModule?.name ?? null
       }
     };
   } catch (error) {
     return {
-      scenes: createStoryboard(text, template),
+      scenes: attachContentModuleToScenes(createStoryboard(text, template), contentModule),
       analysis: {
         source: "local-fallback",
         provider: llm.provider,
         model: llm.model,
         promptId: "storyboard",
+        contentModuleId: contentModule?.id ?? null,
+        contentModuleName: contentModule?.name ?? null,
         error: error.message
       }
     };
@@ -157,7 +164,7 @@ export async function testModelConnection({ kind, settings }) {
   };
 }
 
-async function createStoryboardWithOpenAICompatible({ text, template, prompt, modelConfig }) {
+async function createStoryboardWithOpenAICompatible({ text, template, prompt, contentModule, modelConfig }) {
   if (modelConfig.provider === "local") {
     throw new Error("本地大模型适配器未接入。");
   }
@@ -181,8 +188,10 @@ async function createStoryboardWithOpenAICompatible({ text, template, prompt, mo
           "{\"scenes\":[{\"visualDescription\":\"\",\"narration\":\"\",\"subtitle\":\"\",\"duration\":3}]}",
           `视频模板：${template.name}`,
           `模板画风：${template.stylePrompt}`,
+          contentModule ? `短视频模块：${contentModule.name}` : "",
+          contentModule?.prompt ? `模块提示词：${contentModule.prompt}` : "",
           `用户文本：${text}`
-        ].join("\n")
+        ].filter(Boolean).join("\n")
       }
     ],
     temperature: 0.45,
@@ -268,6 +277,17 @@ function normalizeScenes(payload, template) {
   });
 }
 
+function attachContentModuleToScenes(scenes, contentModule) {
+  if (!contentModule?.prompt) {
+    return scenes;
+  }
+
+  return scenes.map((scene) => ({
+    ...scene,
+    visualDescription: `${scene.visualDescription}; 内容模块：${contentModule.name}; 模块逻辑：${contentModule.prompt}`
+  }));
+}
+
 function normalizeDuration(value) {
   const duration = Number(value);
   if (!Number.isFinite(duration) || duration <= 0) {
@@ -283,6 +303,16 @@ function compactSubtitle(value) {
 
 function getPrompt(settings, id) {
   return settings.prompts.find((prompt) => prompt.id === id)?.prompt ?? "";
+}
+
+function buildStoryboardPrompt(settings, contentModule) {
+  return [
+    getPrompt(settings, "storyboard"),
+    contentModule?.prompt ? "下面是当前短视频模块的内容逻辑，必须优先遵守：" : "",
+    contentModule?.prompt ?? ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function toChatCompletionsEndpoint(baseUrl) {

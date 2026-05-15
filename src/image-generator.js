@@ -6,11 +6,11 @@ const WIDTH = 1280;
 const HEIGHT = 720;
 const FONT_FILE = "C\\:/Windows/Fonts/msyh.ttc";
 
-export async function generateSceneImage({ scene, template, outputPath, settings = null }) {
+export async function generateSceneImage({ scene, template, outputPath, settings = null, contentModule = null }) {
   const imageConfig = settings?.models?.image;
   if (imageConfig?.enabled && imageConfig.provider === "image2") {
     try {
-      const prompt = buildImage2Prompt({ scene, template, settings });
+      const prompt = buildImage2Prompt({ scene, template, settings, contentModule });
       return await generateImage2({
         prompt,
         modelConfig: imageConfig,
@@ -74,10 +74,11 @@ async function generateLocalSceneImage({ scene, template, outputPath }) {
   ]);
 }
 
-function buildImage2Prompt({ scene, template, settings }) {
+function buildImage2Prompt({ scene, template, settings, contentModule }) {
   const prompt = settings?.prompts?.find((item) => item.id === "image")?.prompt ?? "";
   return [
     prompt,
+    contentModule?.prompt ? `Content module rule: ${contentModule.prompt}` : "",
     `Video template: ${template.name}`,
     `Unified style: ${template.stylePrompt}`,
     "Aspect ratio: 16:9. Output should work as a video storyboard frame.",
