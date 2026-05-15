@@ -54,6 +54,10 @@ textarea {
   margin-bottom: 18px;
 }
 
+.admin-topbar {
+  margin-bottom: 12px;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--accent-2);
@@ -113,6 +117,39 @@ h2 {
 .small-button.full {
   width: 100%;
   margin-top: 12px;
+}
+
+.admin-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+.admin-tab {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-tab.active {
+  border-color: var(--accent);
+  background: #fffdf7;
+  color: var(--text);
+  font-weight: 800;
 }
 
 .layout {
@@ -418,10 +455,32 @@ video.ready {
   margin-bottom: 16px;
 }
 
+.admin-view {
+  display: none;
+}
+
+.admin-view.active {
+  display: block;
+}
+
+.admin-message {
+  min-height: 22px;
+  margin: 0 0 12px;
+}
+
 .model-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  margin-top: 16px;
+}
+
+.model-grid.two-columns {
+  grid-template-columns: minmax(320px, 0.95fr) minmax(320px, 1.05fr);
+}
+
+.single-config {
+  width: min(720px, 100%);
   margin-top: 16px;
 }
 
@@ -494,6 +553,11 @@ video.ready {
   margin-top: 16px;
 }
 
+.voice-form.stacked {
+  display: block;
+  margin-top: 0;
+}
+
 .voice-form .check-row,
 .voice-form .compact {
   grid-column: 1 / -1;
@@ -502,6 +566,11 @@ video.ready {
 .voice-form .compact {
   max-width: 280px;
   margin-top: 0;
+}
+
+.voice-form.stacked .compact {
+  max-width: none;
+  margin-top: 14px;
 }
 
 .voice-list {
@@ -643,6 +712,7 @@ video.ready {
   .template-grid,
   .admin-grid,
   .model-grid,
+  .model-grid.two-columns,
   .voice-form,
   .voice-row,
   .job-row {

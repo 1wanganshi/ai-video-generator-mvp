@@ -5,7 +5,8 @@ const elements = {
   jobCount: document.querySelector("#jobCount"),
   jobTable: document.querySelector("#jobTable"),
   refreshButton: document.querySelector("#refreshButton"),
-  saveModelsButton: document.querySelector("#saveModelsButton"),
+  saveImageModelButton: document.querySelector("#saveImageModelButton"),
+  saveTtsModelButton: document.querySelector("#saveTtsModelButton"),
   savePromptsButton: document.querySelector("#savePromptsButton"),
   promptList: document.querySelector("#promptList"),
   defaultVoiceSelect: document.querySelector("#defaultVoiceSelect"),
@@ -17,8 +18,12 @@ const elements = {
 
 let settings = null;
 
+document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+  button.addEventListener("click", () => activateTab(button.dataset.adminTab));
+});
 elements.refreshButton.addEventListener("click", loadAdminState);
-elements.saveModelsButton.addEventListener("click", saveModels);
+elements.saveImageModelButton.addEventListener("click", saveImageModel);
+elements.saveTtsModelButton.addEventListener("click", saveTtsModel);
 elements.savePromptsButton.addEventListener("click", savePrompts);
 elements.setDefaultVoiceButton.addEventListener("click", setDefaultVoice);
 elements.voiceCloneForm.addEventListener("submit", uploadVoiceClone);
@@ -28,6 +33,15 @@ document.querySelectorAll("[data-test-model]").forEach((button) => {
 
 loadAdminState();
 window.setInterval(loadQueueState, 1200);
+
+function activateTab(tabId) {
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminTab === tabId);
+  });
+  document.querySelectorAll("[data-admin-view]").forEach((view) => {
+    view.classList.toggle("active", view.dataset.adminView === tabId);
+  });
+}
 
 async function loadAdminState() {
   clearMessage();
@@ -64,7 +78,6 @@ function renderQueue(data) {
 }
 
 function renderSettings(nextSettings) {
-  fillModelFields("llm", nextSettings.models.llm);
   fillModelFields("image", nextSettings.models.image);
   fillModelFields("tts", nextSettings.models.tts);
   document.querySelector("#ttsCloneEnabled").checked = Boolean(nextSettings.models.tts.cloneEnabled);
@@ -128,18 +141,25 @@ function renderVoices(voices, defaultVoiceId) {
     .join("");
 }
 
-async function saveModels() {
+async function saveImageModel() {
   clearMessage();
-  const payload = readModelsPayload();
+  await saveModels({ image: readImageFields() }, "图片大模型已保存。");
+}
 
+async function saveTtsModel() {
+  clearMessage();
+  await saveModels({ tts: readTtsFields() }, "TTS 模型已保存。");
+}
+
+async function saveModels(models, successMessage) {
   try {
     settings = await fetchJson("/api/admin/models", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ models })
     });
     renderSettings(settings);
-    showMessage("模型配置已保存。", false);
+    showMessage(successMessage, false);
   } catch (error) {
     showMessage(error.message);
   }
@@ -153,23 +173,16 @@ async function testModel(kind) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind,
-        ...readModelsPayload()
+        models: {
+          image: readImageFields(),
+          tts: readTtsFields()
+        }
       })
     });
     showMessage(`${result.kind}: ${result.message} (${result.latencyMs}ms)`, !result.ok);
   } catch (error) {
     showMessage(error.message);
   }
-}
-
-function readModelsPayload() {
-  return {
-    models: {
-      llm: readModelFields("llm"),
-      image: readImageFields(),
-      tts: readTtsFields()
-    }
-  };
 }
 
 function readModelFields(prefix) {
