@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台任务中心</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Backend</p>
+            <h1>后台任务中心</h1>
+          </div>
+          <div class="top-actions">
+            <a class="ghost-link" href="/">返回前台</a>
+            <div class="status-pill" id="adminStatus">连接中</div>
+          </div>
+        </header>
+
+        <section class="admin-grid">
+          <article class="metric panel">
+            <span>当前任务</span>
+            <strong id="activeJob">无</strong>
+          </article>
+          <article class="metric panel">
+            <span>排队任务</span>
+            <strong id="waitingCount">0</strong>
+          </article>
+          <article class="metric panel">
+            <span>任务总数</span>
+            <strong id="jobCount">0</strong>
+          </article>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Models</p>
+              <h2>模型配置</h2>
+            </div>
+            <button class="small-button" id="saveModelsButton" type="button">保存模型</button>
+          </div>
+
+          <div class="model-grid">
+            <article class="config-block">
+              <h3>大模型</h3>
+              <label class="check-row"><input id="llmEnabled" type="checkbox" /> 启用</label>
+              <label>供应商</label>
+              <select id="llmProvider">
+                <option value="openai-compatible">OpenAI Compatible</option>
+                <option value="siliconflow">SiliconFlow</option>
+                <option value="volcengine">火山引擎</option>
+                <option value="aliyun">阿里云百炼</option>
+                <option value="local">本地模型</option>
+              </select>
+              <label>Base URL</label>
+              <input id="llmBaseUrl" type="text" placeholder="https://api.example.com/v1" />
+              <label>API Key</label>
+              <input id="llmApiKey" type="password" autocomplete="off" />
+              <label>模型名</label>
+              <input id="llmModel" type="text" placeholder="gpt-4o-mini" />
+              <button class="small-button full" data-test-model="llm" type="button">测试大模型</button>
+            </article>
+
+            <article class="config-block">
+              <h3>图片模型</h3>
+              <label class="check-row"><input id="imageEnabled" type="checkbox" /> 启用</label>
+              <label>供应商</label>
+              <select id="imageProvider">
+                <option value="image2">GPT Image 2 / image2</option>
+                <option value="openai-compatible">OpenAI Compatible</option>
+                <option value="stability">Stability</option>
+                <option value="midjourney-proxy">Midjourney Proxy</option>
+                <option value="volcengine">火山引擎</option>
+                <option value="local">本地模型</option>
+              </select>
+              <label>Base URL</label>
+              <input id="imageBaseUrl" type="text" />
+              <label>API Key</label>
+              <input id="imageApiKey" type="password" autocomplete="off" />
+              <label>模型名</label>
+              <input id="imageModel" type="text" placeholder="gpt-image-2" />
+              <label>尺寸</label>
+              <input id="imageSize" type="text" placeholder="1536x864" />
+              <label>质量</label>
+              <select id="imageQuality">
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+                <option value="auto">auto</option>
+              </select>
+              <label>输出格式</label>
+              <select id="imageOutputFormat">
+                <option value="png">png</option>
+                <option value="jpeg">jpeg</option>
+                <option value="webp">webp</option>
+              </select>
+              <label>背景</label>
+              <select id="imageBackground">
+                <option value="auto">auto</option>
+                <option value="opaque">opaque</option>
+                <option value="transparent">transparent</option>
+              </select>
+              <button class="small-button full" data-test-model="image" type="button">测试图片模型</button>
+            </article>
+
+            <article class="config-block">
+              <h3>TTS / 音色克隆</h3>
+              <label class="check-row"><input id="ttsEnabled" type="checkbox" /> 启用旁白</label>
+              <label class="check-row"><input id="ttsCloneEnabled" type="checkbox" /> 允许克隆音色</label>
+              <label>供应商</label>
+              <select id="ttsProvider">
+                <option value="local-ffmpeg">本地预览</option>
+                <option value="aliyun-dashscope">阿里百炼 DashScope</option>
+                <option value="openai-compatible">OpenAI Compatible</option>
+                <option value="elevenlabs">ElevenLabs</option>
+                <option value="minimax">MiniMax</option>
+                <option value="index-tts">IndexTTS</option>
+              </select>
+              <label>Base URL</label>
+              <input id="ttsBaseUrl" type="text" />
+              <label>API Key</label>
+              <input id="ttsApiKey" type="password" autocomplete="off" />
+              <label>模型名</label>
+              <input id="ttsModel" type="text" placeholder="local-preview-voice" />
+              <label>复刻模型</label>
+              <input id="ttsCloneModel" type="text" placeholder="qwen-voice-enrollment" />
+              <label>复刻目标模型</label>
+              <input id="ttsCloneTargetModel" type="text" placeholder="qwen3-tts-vc-2026-01-22" />
+              <label>语种</label>
+              <select id="ttsLanguageType">
+                <option value="Chinese">Chinese</option>
+                <option value="English">English</option>
+                <option value="Auto">Auto</option>
+              </select>
+              <label>默认音色</label>
+              <select id="defaultVoiceSelect"></select>
+              <button class="small-button full" data-test-model="tts" type="button">测试 TTS</button>
+              <button class="small-button full" id="setDefaultVoiceButton" type="button">设为默认音色</button>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Prompts</p>
+              <h2>提示词模块</h2>
+            </div>
+            <button class="small-button" id="savePromptsButton" type="button">保存提示词</button>
+          </div>
+          <div class="prompt-list" id="promptList"></div>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Voices</p>
+              <h2>TTS 音色克隆</h2>
+            </div>
+            <button class="small-button" id="refreshButton" type="button">刷新</button>
+          </div>
+
+          <form class="voice-form" id="voiceCloneForm">
+            <label>音色名称</label>
+            <input name="name" type="text" placeholder="例如：创始人口播音色" />
+            <label>声音样本</label>
+            <input name="sample" type="file" accept="audio/*" required />
+            <label class="check-row">
+              <input name="authorized" type="checkbox" required />
+              已获得声音样本本人授权
+            </label>
+            <button class="primary-button compact" type="submit">上传并创建克隆音色</button>
+          </form>
+
+          <div class="voice-list" id="voiceList"></div>
+          <p class="error" id="adminMessage" role="alert"></p>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Jobs</p>
+              <h2>生成记录</h2>
+            </div>
+          </div>
+          <div class="job-table" id="jobTable"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/admin.js" type="module"></script>
+  </body>
+</html>

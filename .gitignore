@@ -1,0 +1,8 @@
+node_modules/
+storage/
+public/storage/
+tmp-test/
+*.log
+.env
+.env.*
+!.env.example

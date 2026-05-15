@@ -1,0 +1,14 @@
+{
+  "name": "ai-video-generator-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "smoke": "node scripts/smoke-test.js",
+    "health": "node scripts/health-check.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
