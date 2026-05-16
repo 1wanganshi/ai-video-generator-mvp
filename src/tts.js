@@ -5,7 +5,9 @@ import { synthesizeAliyunNarration } from "./aliyun-tts.js";
 export async function synthesizeNarration({ scenes, settings, outputPath }) {
   const tts = settings.models.tts;
   const voices = settings.voices ?? [];
-  const voice = voices.find((item) => item.id === tts.defaultVoiceId) ?? voices[0];
+  const contentModule = settings.currentContentModule ?? null;
+  const voiceId = contentModule?.voiceId || tts.defaultVoiceId;
+  const voice = voices.find((item) => item.id === voiceId) ?? voices.find((item) => item.id === tts.defaultVoiceId) ?? voices[0];
   const totalDuration = scenes.reduce((sum, scene) => sum + scene.duration, 0);
 
   if (!tts.enabled || !voice) {
@@ -14,7 +16,10 @@ export async function synthesizeNarration({ scenes, settings, outputPath }) {
 
   if (tts.provider === "aliyun-dashscope") {
     try {
-      const prompt = settings.prompts.find((item) => item.id === "tts")?.prompt ?? "";
+      const promptSet = (contentModule?.promptSets ?? []).find((item) => item.id === contentModule?.promptSetId);
+      const prompt = [settings.prompts.find((item) => item.id === "tts")?.prompt ?? "", promptSet?.ttsPrompt ?? ""]
+        .filter(Boolean)
+        .join("\n");
       const result = await synthesizeAliyunNarration({
         scenes,
         modelConfig: tts,

@@ -6,7 +6,7 @@ const DEFAULT_TIMEOUT_MS = 30000;
 
 export async function analyzeStoryboard({ text, template, settings, contentModule = null }) {
   const prompt = buildStoryboardPrompt(settings, contentModule);
-  const llm = settings.models.llm;
+  const llm = resolveLlmConfig(settings, contentModule);
 
   if (!llm.enabled) {
     return {
@@ -111,6 +111,17 @@ export async function testModelConnection({ kind, settings }) {
   }
 
   if (kind === "llm") {
+    if (modelConfig.provider === "anthropic") {
+      return {
+        ok: false,
+        kind,
+        provider: modelConfig.provider,
+        model: modelConfig.model,
+        latencyMs: Date.now() - startedAt,
+        message: "Claude 预设已提供，但当前后端暂未接入 Anthropic 原生 Messages 适配器。"
+      };
+    }
+
     await callOpenAICompatibleChat({
       modelConfig,
       messages: [
@@ -169,6 +180,10 @@ async function createStoryboardWithOpenAICompatible({ text, template, prompt, co
     throw new Error("本地大模型适配器未接入。");
   }
 
+  if (modelConfig.provider === "anthropic") {
+    throw new Error("Claude 预设已提供，但当前后端暂未接入 Anthropic 原生 Messages 适配器。");
+  }
+
   if (!modelConfig.baseUrl || !modelConfig.model) {
     throw new Error("大模型 Base URL 或模型名未配置。");
   }
@@ -190,6 +205,12 @@ async function createStoryboardWithOpenAICompatible({ text, template, prompt, co
           `模板画风：${template.stylePrompt}`,
           contentModule ? `短视频模块：${contentModule.name}` : "",
           contentModule?.prompt ? `模块提示词：${contentModule.prompt}` : "",
+          getContentModulePromptSet(contentModule)?.scriptPrompt
+            ? `脚本提示词：${getContentModulePromptSet(contentModule).scriptPrompt}`
+            : "",
+          getContentModulePromptSet(contentModule)?.storyboardPrompt
+            ? `分镜提示词：${getContentModulePromptSet(contentModule).storyboardPrompt}`
+            : "",
           `用户文本：${text}`
         ].filter(Boolean).join("\n")
       }
@@ -306,13 +327,36 @@ function getPrompt(settings, id) {
 }
 
 function buildStoryboardPrompt(settings, contentModule) {
+  const promptSet = getContentModulePromptSet(contentModule);
   return [
     getPrompt(settings, "storyboard"),
     contentModule?.prompt ? "下面是当前短视频模块的内容逻辑，必须优先遵守：" : "",
-    contentModule?.prompt ?? ""
+    contentModule?.prompt ?? "",
+    promptSet?.scriptPrompt ? `脚本生成提示词：${promptSet.scriptPrompt}` : "",
+    promptSet?.storyboardPrompt ? `分镜生成提示词：${promptSet.storyboardPrompt}` : ""
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function resolveLlmConfig(settings, contentModule) {
+  const baseConfig = settings.models.llm;
+  const preset = (settings.llmPresets ?? []).find((item) => item.id === contentModule?.llmPresetId);
+  if (!preset) {
+    return baseConfig;
+  }
+
+  return {
+    ...baseConfig,
+    provider: preset.provider ?? baseConfig.provider,
+    baseUrl: preset.baseUrl ?? baseConfig.baseUrl,
+    model: preset.model ?? baseConfig.model,
+    enabled: baseConfig.enabled && preset.enabled !== false
+  };
+}
+
+function getContentModulePromptSet(contentModule) {
+  return (contentModule?.promptSets ?? []).find((item) => item.id === contentModule?.promptSetId) ?? null;
 }
 
 function toChatCompletionsEndpoint(baseUrl) {

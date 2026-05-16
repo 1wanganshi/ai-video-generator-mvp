@@ -53,6 +53,8 @@
             </div>
             <button class="small-button" id="saveModelsButton" type="button">保存大模型</button>
           </div>
+          <p class="hint">填写 API 地址、API Key 和模型名后点击保存，系统会先测试语言大模型和图片大模型，通过后才保存。</p>
+          <div class="preset-row" id="llmPresetButtons"></div>
           <div class="model-grid two-columns">
             <article class="config-block">
               <h3>语言大模型</h3>
@@ -60,6 +62,7 @@
               <label>供应商</label>
               <select id="llmProvider">
                 <option value="openai-compatible">OpenAI Compatible</option>
+                <option value="anthropic">Anthropic Claude</option>
                 <option value="aliyun-bailian">阿里百炼 OpenAI Compatible</option>
                 <option value="local">本地模型</option>
               </select>

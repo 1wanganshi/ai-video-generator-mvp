@@ -76,9 +76,11 @@ async function generateLocalSceneImage({ scene, template, outputPath }) {
 
 function buildImage2Prompt({ scene, template, settings, contentModule }) {
   const prompt = settings?.prompts?.find((item) => item.id === "image")?.prompt ?? "";
+  const promptSet = (contentModule?.promptSets ?? []).find((item) => item.id === contentModule?.promptSetId);
   return [
     prompt,
     contentModule?.prompt ? `Content module rule: ${contentModule.prompt}` : "",
+    promptSet?.imagePrompt ? `Image prompt set rule: ${promptSet.imagePrompt}` : "",
     `Video template: ${template.name}`,
     `Unified style: ${template.stylePrompt}`,
     "Aspect ratio: 16:9. Output should work as a video storyboard frame.",

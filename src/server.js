@@ -70,9 +70,9 @@ const server = http.createServer(async (request, response) => {
         ? {
             ...settings,
             models: {
-              llm: { ...settings.models.llm, ...payload.models.llm },
-              image: { ...settings.models.image, ...payload.models.image },
-              tts: { ...settings.models.tts, ...payload.models.tts }
+              llm: mergeModelForTest(settings.models.llm, payload.models.llm),
+              image: mergeModelForTest(settings.models.image, payload.models.image),
+              tts: mergeModelForTest(settings.models.tts, payload.models.tts)
             }
           }
         : settings;
@@ -289,6 +289,18 @@ function toAdminSettings(settings) {
   };
 }
 
+function mergeModelForTest(savedModel, modelPatch) {
+  if (!modelPatch) {
+    return savedModel;
+  }
+
+  const patch = { ...modelPatch };
+  if (patch.apiKey === "") {
+    delete patch.apiKey;
+  }
+  return { ...savedModel, ...patch };
+}
+
 function toPublicContentModuleSettings(settings) {
   const modules = (settings.contentModules ?? []).filter((module) => module.enabled).map(toPublicContentModule);
   const activeModule =
@@ -309,6 +321,7 @@ function toPublicContentModule(module) {
     name: module.name,
     description: module.description,
     templateId: module.templateId,
+    promptSetId: module.promptSetId,
     frontTitle: module.frontTitle,
     frontSubtitle: module.frontSubtitle,
     defaultText: module.defaultText

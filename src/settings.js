@@ -206,6 +206,7 @@ function normalizeSettings(settings) {
       image,
       tts: { ...defaults.models.tts, ...settings?.models?.tts }
     },
+    llmPresets: mergeLlmPresets(defaults.llmPresets, settings?.llmPresets),
     prompts: mergePrompts(defaults.prompts, settings?.prompts),
     contentModules: mergeContentModules(defaults.contentModules, settings?.contentModules),
     activeContentModuleId:
@@ -243,9 +244,41 @@ function mergeVoices(defaultVoices, voices) {
   });
 }
 
+function mergeLlmPresets(defaultPresets, presets) {
+  if (!Array.isArray(presets)) {
+    return defaultPresets;
+  }
+
+  const mergedDefaults = defaultPresets.map((defaultPreset) => ({
+    ...defaultPreset,
+    ...normalizeStoredLlmPreset(defaultPreset, presets.find((preset) => preset.id === defaultPreset.id))
+  }));
+  const customPresets = presets.filter((preset) => !defaultPresets.some((defaultPreset) => defaultPreset.id === preset.id));
+  return [...mergedDefaults, ...customPresets];
+}
+
+function normalizeStoredLlmPreset(defaultPreset, storedPreset) {
+  if (!storedPreset) {
+    return {};
+  }
+
+  if (
+    defaultPreset.id === "claude" &&
+    storedPreset.provider === "openai-compatible" &&
+    String(storedPreset.baseUrl ?? "").includes("anthropic.com")
+  ) {
+    return {
+      ...storedPreset,
+      provider: defaultPreset.provider
+    };
+  }
+
+  return storedPreset;
+}
+
 function mergeContentModules(defaultModules, modules) {
   if (!Array.isArray(modules)) {
-    return defaultModules;
+    return defaultModules.map(ensureContentModuleBusinessFields);
   }
 
   const mergedDefaults = defaultModules.map((defaultModule) => ({
@@ -253,7 +286,7 @@ function mergeContentModules(defaultModules, modules) {
     ...(modules.find((module) => module.id === defaultModule.id) ?? {})
   }));
   const customModules = modules.filter((module) => !defaultModules.some((defaultModule) => defaultModule.id === module.id));
-  return [...mergedDefaults, ...customModules];
+  return [...mergedDefaults, ...customModules].map(ensureContentModuleBusinessFields);
 }
 
 function normalizeIncomingContentModule(module) {
@@ -275,11 +308,88 @@ function normalizeIncomingContentModule(module) {
     name,
     description: String(module?.description ?? ""),
     templateId: String(module?.templateId ?? "zen"),
+    llmPresetId: String(module?.llmPresetId ?? "chatgpt"),
+    voiceId: String(module?.voiceId ?? ""),
+    promptSetId: String(module?.promptSetId ?? "prompt_1"),
     frontTitle: String(module?.frontTitle ?? name),
     frontSubtitle: String(module?.frontSubtitle ?? ""),
     defaultText: String(module?.defaultText ?? ""),
-    prompt: String(module?.prompt ?? "")
+    prompt: String(module?.prompt ?? ""),
+    promptSets: normalizePromptSets(module?.promptSets, name, String(module?.prompt ?? ""))
   };
+}
+
+function ensureContentModuleBusinessFields(module) {
+  const promptSets = normalizePromptSets(module.promptSets, module.name, module.prompt);
+  const promptSetId = promptSets.some((promptSet) => promptSet.id === module.promptSetId)
+    ? module.promptSetId
+    : promptSets[0]?.id ?? "prompt_1";
+
+  return {
+    ...module,
+    llmPresetId: module.llmPresetId ?? "chatgpt",
+    voiceId: module.voiceId ?? "",
+    promptSetId,
+    promptSets
+  };
+}
+
+function normalizePromptSets(promptSets, moduleName, modulePrompt) {
+  const defaults = createDefaultPromptSets(moduleName, modulePrompt);
+  if (!Array.isArray(promptSets)) {
+    return defaults;
+  }
+
+  const mergedDefaults = defaults.map((defaultPromptSet) => ({
+    ...defaultPromptSet,
+    ...(promptSets.find((promptSet) => promptSet.id === defaultPromptSet.id) ?? {})
+  }));
+  const customPromptSets = promptSets.filter(
+    (promptSet) => !defaults.some((defaultPromptSet) => defaultPromptSet.id === promptSet.id)
+  );
+  return [...mergedDefaults, ...customPromptSets].map((promptSet, index) => ({
+    id: String(promptSet.id ?? `prompt_${index + 1}`),
+    name: String(promptSet.name ?? `提示词${index + 1}`),
+    scriptPrompt: String(promptSet.scriptPrompt ?? ""),
+    storyboardPrompt: String(promptSet.storyboardPrompt ?? ""),
+    imagePrompt: String(promptSet.imagePrompt ?? ""),
+    ttsPrompt: String(promptSet.ttsPrompt ?? ""),
+    composePrompt: String(promptSet.composePrompt ?? "")
+  }));
+}
+
+function createDefaultPromptSets(moduleName = "短视频", modulePrompt = "") {
+  const cleanName = String(moduleName || "短视频");
+  const baseLogic = String(modulePrompt || `围绕${cleanName}内容做短视频。`);
+  return [
+    {
+      id: "prompt_1",
+      name: "提示词一",
+      scriptPrompt: `把用户输入改写成${cleanName}短视频脚本，保留核心观点，语言直接、有节奏。`,
+      storyboardPrompt: `${baseLogic} 分镜要有开场、展开、转折和收束，每个分镜默认 3 秒。`,
+      imagePrompt: `${cleanName}画面要统一风格、统一色调，避免画面内文字和水印。`,
+      ttsPrompt: "旁白要像真人口播，语速稳定，句间有自然停顿。",
+      composePrompt: "合成时保持图片 3 秒节奏，旁白优先，背景音乐降低音量。"
+    },
+    {
+      id: "prompt_2",
+      name: "提示词二",
+      scriptPrompt: `把用户输入整理成${cleanName}知识型短视频，先抛问题，再给方法。`,
+      storyboardPrompt: `${baseLogic} 分镜要强调问题、原因、方法、结果，字幕适合做金句。`,
+      imagePrompt: "图片要强化主题意象和层次关系，镜头之间保持视觉连续性。",
+      ttsPrompt: "旁白要更沉稳，重点句稍作停顿，不要夸张表演。",
+      composePrompt: "合成时用平稳转场，字幕与旁白节奏一致。"
+    },
+    {
+      id: "prompt_3",
+      name: "提示词三",
+      scriptPrompt: `把用户输入做成${cleanName}观点型短视频，结构更锋利，结尾留一句记忆点。`,
+      storyboardPrompt: `${baseLogic} 分镜要有强开头、强对比、强结尾，适合短视频完播。`,
+      imagePrompt: "图片要有更强构图和情绪张力，但仍保持统一画风。",
+      ttsPrompt: "旁白要更有推动力，短句优先，语气清楚坚定。",
+      composePrompt: "合成时节奏更紧凑，背景音乐只做氛围，不压过人声。"
+    }
+  ];
 }
 
 function createDefaultSettings() {
@@ -321,6 +431,44 @@ function createDefaultSettings() {
         fallbackLocal: true
       }
     },
+    llmPresets: [
+      {
+        id: "deepseek",
+        name: "DeepSeek",
+        provider: "openai-compatible",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        enabled: true,
+        description: "适合中文分析、脚本拆解和结构化分镜。"
+      },
+      {
+        id: "claude",
+        name: "Claude",
+        provider: "anthropic",
+        baseUrl: "https://api.anthropic.com/v1",
+        model: "claude-3-5-sonnet-latest",
+        enabled: true,
+        description: "适合长文本理解和高质量改写；如使用 Anthropic 原生接口，需要后续接专用适配器。"
+      },
+      {
+        id: "chatgpt",
+        name: "ChatGPT",
+        provider: "openai-compatible",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        enabled: true,
+        description: "适合通用短视频脚本、结构化 JSON 和多风格分镜。"
+      },
+      {
+        id: "minimax",
+        name: "MiniMax",
+        provider: "openai-compatible",
+        baseUrl: "https://api.minimax.io/v1",
+        model: "MiniMax-Text-01",
+        enabled: true,
+        description: "适合中文内容生成和短视频口播脚本。"
+      }
+    ],
     prompts: [
       {
         id: "storyboard",
@@ -354,6 +502,9 @@ function createDefaultSettings() {
         name: "国学",
         enabled: true,
         templateId: "guofeng",
+        llmPresetId: "chatgpt",
+        voiceId: "default-narrator",
+        promptSetId: "prompt_1",
         frontTitle: "国学短视频",
         frontSubtitle: "经典智慧、修身处世、东方审美，适合做沉稳、有余味的知识短视频。",
         description: "面向国学、传统文化、修身处世内容。",
@@ -361,6 +512,10 @@ function createDefaultSettings() {
           "人这一生，最难的不是懂很多道理，而是在起心动念处看见自己。能收住一分急躁，就多一分从容；能少一分计较，就多一分天地。",
         prompt:
           "内容模块：国学。分镜要围绕经典智慧、修身处世、东方审美展开。语言要克制、含蓄、有余味，避免鸡汤和玄学化表达。画面可使用古籍、山水、书房、竹影、烛火、云气、宣纸质感等意象。字幕要像短视频金句，但不要夸张。",
+        promptSets: createDefaultPromptSets(
+          "国学",
+          "分镜要围绕经典智慧、修身处世、东方审美展开。语言克制、含蓄、有余味，避免鸡汤和玄学化表达。"
+        ),
         updatedAt: now
       },
       {
@@ -368,6 +523,9 @@ function createDefaultSettings() {
         name: "毛选",
         enabled: true,
         templateId: "mao",
+        llmPresetId: "deepseek",
+        voiceId: "default-narrator",
+        promptSetId: "prompt_1",
         frontTitle: "毛选短视频",
         frontSubtitle: "矛盾分析、实践方法、组织视角，适合做有力量的观点型短视频。",
         description: "面向毛选、方法论、实践论、矛盾论内容。",
@@ -375,6 +533,10 @@ function createDefaultSettings() {
           "很多问题不是没有答案，而是没有回到实际情况里去看。脱离调查，就容易被表象牵着走；回到实践，矛盾的主次才会慢慢显出来。",
         prompt:
           "内容模块：毛选。分镜要强调实践、调查研究、矛盾分析、主要矛盾、群众视角和行动方法。语言要坚定、清楚、有组织性，避免空泛口号。画面可使用红色海报质感、笔记、会议桌、工厂、田野、队伍、阳光和强对比构图。",
+        promptSets: createDefaultPromptSets(
+          "毛选",
+          "分镜要强调实践、调查研究、矛盾分析、主要矛盾、群众视角和行动方法，避免空泛口号。"
+        ),
         updatedAt: now
       },
       {
@@ -382,6 +544,9 @@ function createDefaultSettings() {
         name: "AI 商业",
         enabled: true,
         templateId: "tech",
+        llmPresetId: "chatgpt",
+        voiceId: "default-narrator",
+        promptSetId: "prompt_1",
         frontTitle: "AI 商业短视频",
         frontSubtitle: "产品、效率、增长、自动化，适合做清晰直接的商业解释型短视频。",
         description: "面向 AI 产品、商业效率、自动化和增长内容。",
@@ -389,6 +554,10 @@ function createDefaultSettings() {
           "AI 真正改变业务的地方，不是替代某一个岗位，而是把重复流程变成可复制的系统。谁先把流程跑通，谁就先拿到效率红利。",
         prompt:
           "内容模块：AI 商业。分镜要突出系统、流程、数据、效率、增长、自动化和产品化。语言要具体、可执行、商业感强。画面可使用深色科技界面、数据面板、流程图、团队协作、发光网格、玻璃质感等元素。",
+        promptSets: createDefaultPromptSets(
+          "AI 商业",
+          "分镜要突出系统、流程、数据、效率、增长、自动化和产品化，语言具体、可执行、商业感强。"
+        ),
         updatedAt: now
       }
     ],

@@ -46,6 +46,10 @@ textarea {
   margin: 0 auto;
 }
 
+.phone-frame {
+  width: 100%;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -264,6 +268,35 @@ input[type="file"] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.preset-button {
+  min-height: 66px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fffdf7;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.preset-button strong,
+.preset-button span {
+  display: block;
+}
+
+.preset-button span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .content-module-tabs {
@@ -619,6 +652,32 @@ video.ready {
   min-height: 118px;
 }
 
+.business-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.business-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(238, 229, 214, 0.42);
+}
+
+.business-step strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.business-step textarea {
+  min-height: 150px;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .prompt-list {
   display: grid;
   gap: 12px;
@@ -803,7 +862,19 @@ video.ready {
 
 @media (max-width: 760px) {
   .app-shell {
+    padding: 0;
+    background: #ede6da;
+  }
+
+  .workspace {
+    width: 100%;
+  }
+
+  .phone-frame {
+    min-height: 100vh;
+    margin: 0 auto;
     padding: 14px;
+    background: var(--bg);
   }
 
   .topbar,
@@ -814,6 +885,8 @@ video.ready {
 
   .layout,
   .template-grid,
+  .preset-row,
+  .business-flow,
   .module-fields,
   .admin-grid,
   .model-grid,
@@ -826,5 +899,65 @@ video.ready {
 
   textarea {
     min-height: 210px;
+  }
+
+  .topbar {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: 30px;
+  }
+
+  .top-subtitle {
+    font-size: 14px;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .panel {
+    box-shadow: none;
+  }
+
+  .editor-panel,
+  .progress-panel,
+  .preview-panel {
+    padding: 14px;
+  }
+
+  .content-module-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .template-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .template-card {
+    min-height: 98px;
+    padding: 10px;
+  }
+
+  .preview-panel {
+    margin-bottom: 18px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 980px) {
+  .phone-frame {
+    width: min(430px, 100%);
+    margin: 0 auto;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-panel {
+    grid-column: auto;
   }
 }

@@ -9,86 +9,88 @@
   <body>
     <main class="app-shell">
       <section class="workspace">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">AI Video Generator</p>
-            <h1 id="moduleTitle">文字生成分镜视频</h1>
-            <p class="top-subtitle" id="moduleSubtitle">选择后台配置的短视频模块，自动匹配内容方向、提示词和画风。</p>
-          </div>
-          <div class="top-actions">
-            <a class="ghost-link" href="/admin.html">后台任务</a>
-            <div class="status-pill" id="connectionStatus">待提交</div>
-          </div>
-        </header>
-
-        <div class="layout">
-          <section class="panel editor-panel" aria-label="生成设置">
-            <div class="field">
-              <div class="label-row">
-                <label>内容模块</label>
-                <span id="moduleCount">加载中</span>
-              </div>
-              <div class="content-module-tabs" id="moduleTabs"></div>
+        <div class="phone-frame">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">AI Video Generator</p>
+              <h1 id="moduleTitle">文字生成分镜视频</h1>
+              <p class="top-subtitle" id="moduleSubtitle">选择后台配置的短视频模块，自动匹配内容方向、提示词和画风。</p>
             </div>
+            <div class="top-actions">
+              <a class="ghost-link" href="/admin.html">后台任务</a>
+              <div class="status-pill" id="connectionStatus">待提交</div>
+            </div>
+          </header>
 
-            <div class="field">
-              <label for="scriptText">输入文字</label>
-              <textarea id="scriptText" maxlength="2400">真正的改变，不是突然发生的。
+          <div class="layout">
+            <section class="panel editor-panel" aria-label="生成设置">
+              <div class="field">
+                <div class="label-row">
+                  <label>内容模块</label>
+                  <span id="moduleCount">加载中</span>
+                </div>
+                <div class="content-module-tabs" id="moduleTabs"></div>
+              </div>
+
+              <div class="field">
+                <label for="scriptText">输入文字</label>
+                <textarea id="scriptText" maxlength="2400">真正的改变，不是突然发生的。
 它通常来自一个人每天重复的小动作。
 当你把注意力从结果挪回过程，节奏就会慢慢稳定下来。
 稳定之后，机会才会被你看见。</textarea>
-              <div class="field-meta">
-                <span id="charCount">0 / 2400</span>
-                <span>每个分镜默认 3 秒</span>
+                <div class="field-meta">
+                  <span id="charCount">0 / 2400</span>
+                  <span>每个分镜默认 3 秒</span>
+                </div>
               </div>
-            </div>
 
-            <div class="field">
-              <label for="voiceFile">上传语音</label>
-              <input id="voiceFile" type="file" accept="audio/*" disabled />
-              <p class="hint">语音识别、声音克隆和旁白会在 MVP 跑通后接入。</p>
-            </div>
-
-            <div class="field">
-              <div class="label-row">
-                <label>风格模板</label>
-                <span id="templateCount">加载中</span>
+              <div class="field">
+                <label for="voiceFile">上传语音</label>
+                <input id="voiceFile" type="file" accept="audio/*" disabled />
+                <p class="hint">语音识别、声音克隆和旁白会在 MVP 跑通后接入。</p>
               </div>
-              <div class="template-grid" id="templateGrid"></div>
-            </div>
 
-            <button class="primary-button" id="submitButton" type="button">生成视频</button>
-            <p class="error" id="errorMessage" role="alert"></p>
-          </section>
-
-          <section class="panel progress-panel" aria-label="任务进度">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Progress</p>
-                <h2 id="stageLabel">等待任务</h2>
+              <div class="field">
+                <div class="label-row">
+                  <label>风格模板</label>
+                  <span id="templateCount">加载中</span>
+                </div>
+                <div class="template-grid" id="templateGrid"></div>
               </div>
-              <strong id="progressNumber">0%</strong>
-            </div>
-            <div class="progress-track" aria-hidden="true">
-              <div class="progress-bar" id="progressBar"></div>
-            </div>
-            <ol class="timeline" id="timeline"></ol>
-          </section>
 
-          <section class="panel preview-panel" aria-label="视频预览">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Preview</p>
-                <h2>成片预览</h2>
+              <button class="primary-button" id="submitButton" type="button">生成视频</button>
+              <p class="error" id="errorMessage" role="alert"></p>
+            </section>
+
+            <section class="panel progress-panel" aria-label="任务进度">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Progress</p>
+                  <h2 id="stageLabel">等待任务</h2>
+                </div>
+                <strong id="progressNumber">0%</strong>
               </div>
-              <a class="download-link disabled" id="downloadLink" href="#" download>下载 MP4</a>
-            </div>
-            <div class="video-frame">
-              <video id="videoPlayer" controls playsinline></video>
-              <div class="empty-preview" id="emptyPreview">生成完成后在这里播放</div>
-            </div>
-            <div class="storyboard-strip" id="storyboardStrip"></div>
-          </section>
+              <div class="progress-track" aria-hidden="true">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+              <ol class="timeline" id="timeline"></ol>
+            </section>
+
+            <section class="panel preview-panel" aria-label="视频预览">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Preview</p>
+                  <h2>成片预览</h2>
+                </div>
+                <a class="download-link disabled" id="downloadLink" href="#" download>下载 MP4</a>
+              </div>
+              <div class="video-frame">
+                <video id="videoPlayer" controls playsinline></video>
+                <div class="empty-preview" id="emptyPreview">生成完成后在这里播放</div>
+              </div>
+              <div class="storyboard-strip" id="storyboardStrip"></div>
+            </section>
+          </div>
         </div>
       </section>
     </main>

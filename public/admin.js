@@ -10,6 +10,7 @@ const elements = {
   savePromptsButton: document.querySelector("#savePromptsButton"),
   saveContentModulesButton: document.querySelector("#saveContentModulesButton"),
   addContentModuleButton: document.querySelector("#addContentModuleButton"),
+  llmPresetButtons: document.querySelector("#llmPresetButtons"),
   contentModuleList: document.querySelector("#contentModuleList"),
   promptList: document.querySelector("#promptList"),
   defaultVoiceSelect: document.querySelector("#defaultVoiceSelect"),
@@ -87,9 +88,40 @@ function renderSettings(nextSettings) {
   fillModelFields("image", nextSettings.models.image);
   fillModelFields("tts", nextSettings.models.tts);
   document.querySelector("#ttsCloneEnabled").checked = Boolean(nextSettings.models.tts.cloneEnabled);
+  renderLlmPresets(nextSettings.llmPresets ?? []);
   renderContentModules(nextSettings.contentModules ?? [], nextSettings.activeContentModuleId);
   renderPrompts(nextSettings.prompts ?? []);
   renderVoices(nextSettings.voices ?? [], nextSettings.models.tts.defaultVoiceId);
+}
+
+function renderLlmPresets(presets) {
+  elements.llmPresetButtons.innerHTML = presets
+    .map(
+      (preset) => `
+        <button class="preset-button" type="button" data-llm-preset="${escapeHtml(preset.id)}">
+          <strong>${escapeHtml(preset.name)}</strong>
+          <span>${escapeHtml(preset.model)}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  elements.llmPresetButtons.querySelectorAll("[data-llm-preset]").forEach((button) => {
+    button.addEventListener("click", () => applyLlmPreset(button.dataset.llmPreset));
+  });
+}
+
+function applyLlmPreset(presetId) {
+  const preset = (settings.llmPresets ?? []).find((item) => item.id === presetId);
+  if (!preset) {
+    return;
+  }
+
+  document.querySelector("#llmProvider").value = preset.provider ?? "openai-compatible";
+  document.querySelector("#llmBaseUrl").value = preset.baseUrl ?? "";
+  document.querySelector("#llmModel").value = preset.model ?? "";
+  document.querySelector("#llmEnabled").checked = true;
+  showMessage(`已套用 ${preset.name} 预配置，填入 API Key 后保存。`, false);
 }
 
 function fillModelFields(prefix, model) {
@@ -146,16 +178,73 @@ function renderContentModules(modules, activeModuleId) {
                 ${templateOptions(module.templateId)}
               </select>
             </label>
+            <label>业务大模型
+              <select class="module-llm-preset">
+                ${llmPresetOptions(module.llmPresetId)}
+              </select>
+            </label>
+            <label>业务音色
+              <select class="module-voice">
+                ${voiceOptions(module.voiceId)}
+              </select>
+            </label>
+            <label>提示词方案
+              <select class="module-prompt-set">
+                ${promptSetOptions(module)}
+              </select>
+            </label>
             <label>前台标题<input class="module-front-title" type="text" value="${escapeHtml(module.frontTitle || "")}" /></label>
             <label class="wide">前台副标题<input class="module-front-subtitle" type="text" value="${escapeHtml(module.frontSubtitle || "")}" /></label>
             <label class="wide">后台说明<input class="module-description" type="text" value="${escapeHtml(module.description || "")}" /></label>
             <label class="wide">前台默认文案<textarea class="module-default-text">${escapeHtml(module.defaultText || "")}</textarea></label>
-            <label class="wide">模块提示词<textarea class="module-prompt">${escapeHtml(module.prompt || "")}</textarea></label>
+            <label class="wide">模块总逻辑<textarea class="module-prompt">${escapeHtml(module.prompt || "")}</textarea></label>
+            <div class="wide business-flow">
+              <div class="business-step">
+                <strong>1. 内容分析</strong>
+                <textarea class="module-script-prompt">${escapeHtml(activePromptSet(module).scriptPrompt)}</textarea>
+              </div>
+              <div class="business-step">
+                <strong>2. 生成分镜</strong>
+                <textarea class="module-storyboard-prompt">${escapeHtml(activePromptSet(module).storyboardPrompt)}</textarea>
+              </div>
+              <div class="business-step">
+                <strong>3. 分镜生成图片</strong>
+                <textarea class="module-image-prompt">${escapeHtml(activePromptSet(module).imagePrompt)}</textarea>
+              </div>
+              <div class="business-step">
+                <strong>4. TTS 配音</strong>
+                <textarea class="module-tts-prompt">${escapeHtml(activePromptSet(module).ttsPrompt)}</textarea>
+              </div>
+              <div class="business-step">
+                <strong>5. 合成成片</strong>
+                <textarea class="module-compose-prompt">${escapeHtml(activePromptSet(module).composePrompt)}</textarea>
+              </div>
+            </div>
           </div>
         </article>
       `
     )
     .join("");
+
+  elements.contentModuleList.querySelectorAll(".module-prompt-set").forEach((select) => {
+    select.addEventListener("change", () => refreshPromptSetFields(select.closest(".content-module-card")));
+  });
+}
+
+function refreshPromptSetFields(card) {
+  const moduleId = card.querySelector(".module-id").value.trim();
+  const promptSetId = card.querySelector(".module-prompt-set").value;
+  const module = (settings.contentModules ?? []).find((item) => item.id === moduleId);
+  const promptSet = (module?.promptSets ?? []).find((item) => item.id === promptSetId);
+  if (!promptSet) {
+    return;
+  }
+
+  card.querySelector(".module-script-prompt").value = promptSet.scriptPrompt ?? "";
+  card.querySelector(".module-storyboard-prompt").value = promptSet.storyboardPrompt ?? "";
+  card.querySelector(".module-image-prompt").value = promptSet.imagePrompt ?? "";
+  card.querySelector(".module-tts-prompt").value = promptSet.ttsPrompt ?? "";
+  card.querySelector(".module-compose-prompt").value = promptSet.composePrompt ?? "";
 }
 
 function addContentModule() {
@@ -169,17 +258,82 @@ function addContentModule() {
       name: "新模块",
       enabled: true,
       templateId: "zen",
+      llmPresetId: "chatgpt",
+      voiceId: "default-narrator",
+      promptSetId: "prompt_1",
       frontTitle: "新模块短视频",
       frontSubtitle: "在这里配置前台展示文案。",
       description: "自定义短视频内容方向。",
       defaultText: "把这里改成前台默认展示的短视频文案。",
       prompt: "内容模块：新模块。请描述这个模块的内容逻辑、语言风格、画面意象和字幕风格。",
+      promptSets: createDefaultPromptSets("新模块"),
       updatedAt: now
     }
   ];
   settings.activeContentModuleId = id;
   renderContentModules(settings.contentModules, settings.activeContentModuleId);
   showMessage("已新增模块，编辑后点击保存。", false);
+}
+
+function llmPresetOptions(selectedPresetId) {
+  return (settings?.llmPresets ?? [])
+    .map(
+      (preset) => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedPresetId ? "selected" : ""}>${escapeHtml(preset.name)}</option>`
+    )
+    .join("");
+}
+
+function voiceOptions(selectedVoiceId) {
+  return (settings?.voices ?? [])
+    .map(
+      (voice) => `<option value="${escapeHtml(voice.id)}" ${voice.id === selectedVoiceId ? "selected" : ""}>${escapeHtml(voice.name)}</option>`
+    )
+    .join("");
+}
+
+function promptSetOptions(module) {
+  return (module.promptSets ?? [])
+    .map(
+      (promptSet) =>
+        `<option value="${escapeHtml(promptSet.id)}" ${promptSet.id === module.promptSetId ? "selected" : ""}>${escapeHtml(promptSet.name)}</option>`
+    )
+    .join("");
+}
+
+function activePromptSet(module) {
+  return (module.promptSets ?? []).find((promptSet) => promptSet.id === module.promptSetId) ?? module.promptSets?.[0] ?? createDefaultPromptSets(module.name)[0];
+}
+
+function createDefaultPromptSets(moduleName) {
+  return [
+    {
+      id: "prompt_1",
+      name: "提示词一",
+      scriptPrompt: `把用户输入改写成${moduleName}短视频脚本，保留核心观点，语言直接、有节奏。`,
+      storyboardPrompt: "分镜要有开场、展开、转折和收束，每个分镜默认 3 秒。",
+      imagePrompt: "图片要统一画风、统一色调，避免画面内文字和水印。",
+      ttsPrompt: "旁白要像真人口播，语速稳定，句间有自然停顿。",
+      composePrompt: "合成时保持图片 3 秒节奏，旁白优先，背景音乐降低音量。"
+    },
+    {
+      id: "prompt_2",
+      name: "提示词二",
+      scriptPrompt: "先抛问题，再给方法，适合知识型短视频。",
+      storyboardPrompt: "分镜强调问题、原因、方法、结果。",
+      imagePrompt: "图片强化主题意象和层次关系。",
+      ttsPrompt: "旁白沉稳，重点句稍作停顿。",
+      composePrompt: "合成用平稳转场，字幕与旁白节奏一致。"
+    },
+    {
+      id: "prompt_3",
+      name: "提示词三",
+      scriptPrompt: "结构更锋利，结尾留一句记忆点。",
+      storyboardPrompt: "分镜要有强开头、强对比、强结尾。",
+      imagePrompt: "图片要有更强构图和情绪张力。",
+      ttsPrompt: "旁白更有推动力，短句优先。",
+      composePrompt: "合成节奏更紧凑，背景音乐不压人声。"
+    }
+  ];
 }
 
 function templateOptions(selectedTemplateId) {
@@ -221,7 +375,22 @@ function renderVoices(voices, defaultVoiceId) {
 
 async function saveModelsConfig() {
   clearMessage();
-  await saveModels({ llm: readLlmFields(), image: readImageFields() }, "大模型配置已保存。");
+  const models = { llm: readLlmFields(), image: readImageFields() };
+
+  try {
+    showMessage("正在测试语言大模型和图片大模型...", false);
+    const testKinds = ["llm", "image"].filter((kind) => models[kind].enabled);
+    for (const kind of testKinds) {
+      const result = await testModelConnection(kind, models);
+      if (!result.ok) {
+        showMessage(`${kind === "llm" ? "语言大模型" : "图片大模型"}测试未通过：${result.message}`);
+        return;
+      }
+    }
+    await saveModels(models, "大模型测试通过，配置已保存。");
+  } catch (error) {
+    showMessage(error.message);
+  }
 }
 
 async function saveTtsModel() {
@@ -246,22 +415,23 @@ async function saveModels(models, successMessage) {
 async function testModel(kind) {
   clearMessage();
   try {
-    const result = await fetchJson("/api/admin/models/test", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind,
-        models: {
-          llm: readLlmFields(),
-          image: readImageFields(),
-          tts: readTtsFields()
-        }
-      })
+    const result = await testModelConnection(kind, {
+      llm: readLlmFields(),
+      image: readImageFields(),
+      tts: readTtsFields()
     });
     showMessage(`${result.kind}: ${result.message} (${result.latencyMs}ms)`, !result.ok);
   } catch (error) {
     showMessage(error.message);
   }
+}
+
+async function testModelConnection(kind, models) {
+  return fetchJson("/api/admin/models/test", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind, models })
+  });
 }
 
 function readModelFields(prefix) {
@@ -339,11 +509,15 @@ async function saveContentModules() {
     enabled: card.querySelector(".module-enabled").checked,
     name: card.querySelector(".module-name").value.trim(),
     templateId: card.querySelector(".module-template").value,
+    llmPresetId: card.querySelector(".module-llm-preset").value,
+    voiceId: card.querySelector(".module-voice").value,
+    promptSetId: card.querySelector(".module-prompt-set").value,
     frontTitle: card.querySelector(".module-front-title").value.trim(),
     frontSubtitle: card.querySelector(".module-front-subtitle").value.trim(),
     description: card.querySelector(".module-description").value.trim(),
     defaultText: card.querySelector(".module-default-text").value.trim(),
-    prompt: card.querySelector(".module-prompt").value.trim()
+    prompt: card.querySelector(".module-prompt").value.trim(),
+    promptSets: updatePromptSetsFromCard(card)
   }));
   const activeModuleId = document.querySelector('input[name="activeContentModule"]:checked')?.value;
 
@@ -358,6 +532,26 @@ async function saveContentModules() {
   } catch (error) {
     showMessage(error.message);
   }
+}
+
+function updatePromptSetsFromCard(card) {
+  const selectedPromptSetId = card.querySelector(".module-prompt-set").value;
+  const moduleId = card.querySelector(".module-id").value.trim();
+  const module = (settings.contentModules ?? []).find((item) => item.id === moduleId);
+  const promptSets = module?.promptSets?.length ? module.promptSets : createDefaultPromptSets(card.querySelector(".module-name").value.trim());
+
+  return promptSets.map((promptSet) =>
+    promptSet.id === selectedPromptSetId
+      ? {
+          ...promptSet,
+          scriptPrompt: card.querySelector(".module-script-prompt").value.trim(),
+          storyboardPrompt: card.querySelector(".module-storyboard-prompt").value.trim(),
+          imagePrompt: card.querySelector(".module-image-prompt").value.trim(),
+          ttsPrompt: card.querySelector(".module-tts-prompt").value.trim(),
+          composePrompt: card.querySelector(".module-compose-prompt").value.trim()
+        }
+      : promptSet
+  );
 }
 
 async function setDefaultVoice() {

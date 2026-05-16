@@ -196,7 +196,8 @@ async function runJob({ id, text, template, contentModule, jobDir, publicJobDir 
 
     const settings = await getSettings();
     const currentContentModule = contentModule ?? resolveContentModule(settings);
-    const analysisResult = await analyzeStoryboard({ text, template, settings, contentModule: currentContentModule });
+    const moduleSettings = withCurrentContentModule(settings, currentContentModule);
+    const analysisResult = await analyzeStoryboard({ text, template, settings: moduleSettings, contentModule: currentContentModule });
     const scenes = analysisResult.scenes;
     if (!scenes.length) {
       throw new Error("文本内容为空，无法生成分镜。");
@@ -215,9 +216,9 @@ async function runJob({ id, text, template, contentModule, jobDir, publicJobDir 
       progress: 22,
       modelSnapshot: {
         llm: {
-          provider: settings.models.llm.provider,
-          model: settings.models.llm.model,
-          enabled: settings.models.llm.enabled
+          provider: moduleSettings.models.llm.provider,
+          model: resolveLlmModelName(moduleSettings, currentContentModule),
+          enabled: moduleSettings.models.llm.enabled
         },
         image: {
           provider: settings.models.image.provider,
@@ -256,7 +257,7 @@ async function runJob({ id, text, template, contentModule, jobDir, publicJobDir 
         scene: scenes[index],
         template,
         outputPath: imagePath,
-        settings,
+        settings: moduleSettings,
         contentModule: currentContentModule
       });
 
@@ -277,7 +278,7 @@ async function runJob({ id, text, template, contentModule, jobDir, publicJobDir 
     const narrationAudioPath = path.join(jobDir, "narration.wav");
     const ttsResult = await synthesizeNarration({
       scenes,
-      settings,
+      settings: moduleSettings,
       outputPath: narrationAudioPath
     });
 
@@ -367,12 +368,29 @@ function resolveContentModule(settings, moduleId = null) {
   );
 }
 
+function withCurrentContentModule(settings, contentModule) {
+  return {
+    ...settings,
+    currentContentModule: contentModule
+  };
+}
+
+function resolveLlmModelName(settings, contentModule) {
+  return (
+    (settings.llmPresets ?? []).find((preset) => preset.id === contentModule?.llmPresetId)?.model ??
+    settings.models.llm.model
+  );
+}
+
 function toJobContentModule(module) {
   return {
     id: module.id,
     name: module.name,
     templateId: module.templateId,
-    frontTitle: module.frontTitle
+    frontTitle: module.frontTitle,
+    llmPresetId: module.llmPresetId,
+    voiceId: module.voiceId,
+    promptSetId: module.promptSetId
   };
 }
 
