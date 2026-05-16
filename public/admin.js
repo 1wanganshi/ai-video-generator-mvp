@@ -11,6 +11,7 @@ const elements = {
   saveContentModulesButton: document.querySelector("#saveContentModulesButton"),
   addContentModuleButton: document.querySelector("#addContentModuleButton"),
   llmPresetButtons: document.querySelector("#llmPresetButtons"),
+  contentModuleNav: document.querySelector("#contentModuleNav"),
   contentModuleList: document.querySelector("#contentModuleList"),
   promptList: document.querySelector("#promptList"),
   defaultVoiceSelect: document.querySelector("#defaultVoiceSelect"),
@@ -21,6 +22,7 @@ const elements = {
 };
 
 let settings = null;
+let activeEditorModuleId = null;
 
 document.querySelectorAll("[data-admin-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.adminTab));
@@ -30,7 +32,7 @@ elements.saveModelsButton.addEventListener("click", saveModelsConfig);
 elements.saveTtsModelButton.addEventListener("click", saveTtsModel);
 elements.savePromptsButton.addEventListener("click", savePrompts);
 elements.saveContentModulesButton.addEventListener("click", saveContentModules);
-elements.addContentModuleButton.addEventListener("click", addContentModule);
+elements.addContentModuleButton?.addEventListener("click", addContentModule);
 elements.setDefaultVoiceButton.addEventListener("click", setDefaultVoice);
 elements.voiceCloneForm.addEventListener("submit", uploadVoiceClone);
 document.querySelectorAll("[data-test-model]").forEach((button) => {
@@ -159,18 +161,93 @@ function renderPrompts(prompts) {
 }
 
 function renderContentModules(modules, activeModuleId) {
-  elements.contentModuleList.innerHTML = modules
-    .map(
-      (module) => `
-        <article class="content-module-card" data-content-module-id="${escapeHtml(module.id)}">
-          <div class="content-module-head">
-            <label class="radio-row">
-              <input name="activeContentModule" type="radio" value="${escapeHtml(module.id)}" ${module.id === activeModuleId ? "checked" : ""} />
-              前台展示
-            </label>
-            <label class="check-row"><input class="module-enabled" type="checkbox" ${module.enabled ? "checked" : ""} /> 启用</label>
+  const safeModules = modules ?? [];
+  const fallbackModuleId = activeModuleId || safeModules[0]?.id;
+
+  if (!safeModules.length) {
+    activeEditorModuleId = null;
+    elements.contentModuleNav.innerHTML = `<button class="content-module-nav-button add" data-add-content-module type="button">新增模块</button>`;
+    elements.contentModuleList.innerHTML = `<p class="hint">暂无短视频模块，点击“新增模块”开始配置。</p>`;
+    elements.contentModuleNav.querySelector("[data-add-content-module]").addEventListener("click", addContentModule);
+    return;
+  }
+
+  if (!safeModules.some((module) => module.id === activeEditorModuleId)) {
+    activeEditorModuleId = fallbackModuleId;
+  }
+
+  const activeModule = safeModules.find((module) => module.id === activeEditorModuleId) ?? safeModules[0];
+  activeEditorModuleId = activeModule.id;
+
+  elements.contentModuleNav.innerHTML = `
+    ${safeModules
+      .map(
+        (module) => `
+          <button
+            class="content-module-nav-button ${module.id === activeEditorModuleId ? "active" : ""}"
+            data-module-nav-id="${escapeHtml(module.id)}"
+            type="button"
+          >
+            <strong>${escapeHtml(module.name || module.id)}</strong>
+            <span>${module.id === activeModuleId ? "前台展示中" : module.enabled ? "已启用" : "已停用"}</span>
+          </button>
+        `
+      )
+      .join("")}
+    <button class="content-module-nav-button add" data-add-content-module type="button">新增模块</button>
+  `;
+  elements.contentModuleList.innerHTML = renderContentModuleEditor(activeModule, activeModule.id === activeModuleId);
+
+  elements.contentModuleNav.querySelectorAll("[data-module-nav-id]").forEach((button) => {
+    button.addEventListener("click", () => selectContentModule(button.dataset.moduleNavId));
+  });
+  elements.contentModuleNav.querySelector("[data-add-content-module]").addEventListener("click", addContentModule);
+  elements.contentModuleList.querySelectorAll(".module-prompt-set").forEach((select) => {
+    select.addEventListener("change", () => {
+      const previousPromptSetId = select.dataset.currentPromptSet;
+      persistCurrentContentModuleEdits(previousPromptSetId);
+      select.dataset.currentPromptSet = select.value;
+      refreshPromptSetFields(select.closest(".content-module-card"));
+    });
+  });
+  elements.contentModuleList.querySelectorAll('input[name="activeContentModule"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      persistCurrentContentModuleEdits();
+      settings.activeContentModuleId = input.value;
+      renderContentModules(settings.contentModules, settings.activeContentModuleId);
+    });
+  });
+}
+
+function renderContentModuleEditor(module, isActiveModule) {
+  const promptSet = activePromptSet(module);
+
+  return `
+    <article class="content-module-card workflow-editor" data-content-module-id="${escapeHtml(module.id)}">
+      <div class="content-module-workflow-head">
+        <div>
+          <p class="eyebrow">Module Workflow</p>
+          <h3>${escapeHtml(module.name || module.id)}</h3>
+        </div>
+        <div class="workflow-head-actions">
+          <label class="radio-row">
+            <input class="module-set-front-active" name="activeContentModule" type="radio" value="${escapeHtml(module.id)}" ${isActiveModule ? "checked" : ""} />
+            前台展示这个模块
+          </label>
+          <label class="check-row"><input class="module-enabled" type="checkbox" ${module.enabled ? "checked" : ""} /> 启用</label>
+        </div>
+      </div>
+
+      <div class="workflow-list">
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">01</span>
+            <div>
+              <h4>模块基础信息</h4>
+              <p>配置后台模块名称、前台展示文案和用户默认输入内容。</p>
+            </div>
           </div>
-          <div class="module-fields">
+          <div class="workflow-fields">
             <label>模块 ID<input class="module-id" type="text" value="${escapeHtml(module.id)}" readonly /></label>
             <label>模块名称<input class="module-name" type="text" value="${escapeHtml(module.name || "")}" /></label>
             <label>关联风格模板
@@ -178,57 +255,107 @@ function renderContentModules(modules, activeModuleId) {
                 ${templateOptions(module.templateId)}
               </select>
             </label>
+            <label>前台标题<input class="module-front-title" type="text" value="${escapeHtml(module.frontTitle || "")}" /></label>
+            <label class="wide">前台副标题<input class="module-front-subtitle" type="text" value="${escapeHtml(module.frontSubtitle || "")}" /></label>
+            <label class="wide">后台说明<input class="module-description" type="text" value="${escapeHtml(module.description || "")}" /></label>
+            <label class="wide">前台默认文案<textarea class="module-default-text compact-textarea">${escapeHtml(module.defaultText || "")}</textarea></label>
+            <label class="wide">模块总逻辑<textarea class="module-prompt">${escapeHtml(module.prompt || "")}</textarea></label>
+          </div>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">02</span>
+            <div>
+              <h4>模型与提示词方案</h4>
+              <p>为这个业务模块选择语言大模型，并切换提示词一、二、三做质量对比。</p>
+            </div>
+          </div>
+          <div class="workflow-fields">
             <label>业务大模型
               <select class="module-llm-preset">
                 ${llmPresetOptions(module.llmPresetId)}
               </select>
             </label>
+            <label>提示词方案
+              <select class="module-prompt-set" data-current-prompt-set="${escapeHtml(module.promptSetId || promptSet.id)}">
+                ${promptSetOptions(module)}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">03</span>
+            <div>
+              <h4>内容生成提示词</h4>
+              <p>控制用户输入如何被改写成短视频脚本与旁白方向。</p>
+            </div>
+          </div>
+          <textarea class="module-script-prompt workflow-textarea">${escapeHtml(promptSet.scriptPrompt || "")}</textarea>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">04</span>
+            <div>
+              <h4>生成分镜提示词</h4>
+              <p>控制分镜数量、节奏、字幕和每个镜头默认 3 秒的结构。</p>
+            </div>
+          </div>
+          <textarea class="module-storyboard-prompt workflow-textarea">${escapeHtml(promptSet.storyboardPrompt || "")}</textarea>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">05</span>
+            <div>
+              <h4>分镜生成图片提示词</h4>
+              <p>控制 image2 生成分镜图的统一画风、色调、构图和禁用项。</p>
+            </div>
+          </div>
+          <textarea class="module-image-prompt workflow-textarea">${escapeHtml(promptSet.imagePrompt || "")}</textarea>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">06</span>
+            <div>
+              <h4>TTS 配音</h4>
+              <p>选择音色，并控制旁白合成时的语气、语速和停顿。</p>
+            </div>
+          </div>
+          <div class="workflow-fields">
             <label>业务音色
               <select class="module-voice">
                 ${voiceOptions(module.voiceId)}
               </select>
             </label>
-            <label>提示词方案
-              <select class="module-prompt-set">
-                ${promptSetOptions(module)}
-              </select>
-            </label>
-            <label>前台标题<input class="module-front-title" type="text" value="${escapeHtml(module.frontTitle || "")}" /></label>
-            <label class="wide">前台副标题<input class="module-front-subtitle" type="text" value="${escapeHtml(module.frontSubtitle || "")}" /></label>
-            <label class="wide">后台说明<input class="module-description" type="text" value="${escapeHtml(module.description || "")}" /></label>
-            <label class="wide">前台默认文案<textarea class="module-default-text">${escapeHtml(module.defaultText || "")}</textarea></label>
-            <label class="wide">模块总逻辑<textarea class="module-prompt">${escapeHtml(module.prompt || "")}</textarea></label>
-            <div class="wide business-flow">
-              <div class="business-step">
-                <strong>1. 内容分析</strong>
-                <textarea class="module-script-prompt">${escapeHtml(activePromptSet(module).scriptPrompt)}</textarea>
-              </div>
-              <div class="business-step">
-                <strong>2. 生成分镜</strong>
-                <textarea class="module-storyboard-prompt">${escapeHtml(activePromptSet(module).storyboardPrompt)}</textarea>
-              </div>
-              <div class="business-step">
-                <strong>3. 分镜生成图片</strong>
-                <textarea class="module-image-prompt">${escapeHtml(activePromptSet(module).imagePrompt)}</textarea>
-              </div>
-              <div class="business-step">
-                <strong>4. TTS 配音</strong>
-                <textarea class="module-tts-prompt">${escapeHtml(activePromptSet(module).ttsPrompt)}</textarea>
-              </div>
-              <div class="business-step">
-                <strong>5. 合成成片</strong>
-                <textarea class="module-compose-prompt">${escapeHtml(activePromptSet(module).composePrompt)}</textarea>
-              </div>
+          </div>
+          <textarea class="module-tts-prompt workflow-textarea">${escapeHtml(promptSet.ttsPrompt || "")}</textarea>
+        </section>
+
+        <section class="workflow-step">
+          <div class="workflow-step-head">
+            <span class="workflow-step-index">07</span>
+            <div>
+              <h4>合成成片</h4>
+              <p>控制图片、旁白、字幕、背景音乐和转场如何合成为 MP4。</p>
             </div>
           </div>
-        </article>
-      `
-    )
-    .join("");
+          <textarea class="module-compose-prompt workflow-textarea">${escapeHtml(promptSet.composePrompt || "")}</textarea>
+        </section>
+      </div>
+    </article>
+  `;
+}
 
-  elements.contentModuleList.querySelectorAll(".module-prompt-set").forEach((select) => {
-    select.addEventListener("change", () => refreshPromptSetFields(select.closest(".content-module-card")));
-  });
+function selectContentModule(moduleId) {
+  persistCurrentContentModuleEdits();
+  activeEditorModuleId = moduleId;
+  settings.activeContentModuleId = moduleId;
+  renderContentModules(settings.contentModules, settings.activeContentModuleId);
 }
 
 function refreshPromptSetFields(card) {
@@ -249,6 +376,7 @@ function refreshPromptSetFields(card) {
 
 function addContentModule() {
   clearMessage();
+  persistCurrentContentModuleEdits();
   const id = `module_${Date.now().toString(36)}`;
   const now = new Date().toISOString();
   settings.contentModules = [
@@ -271,6 +399,7 @@ function addContentModule() {
     }
   ];
   settings.activeContentModuleId = id;
+  activeEditorModuleId = id;
   renderContentModules(settings.contentModules, settings.activeContentModuleId);
   showMessage("已新增模块，编辑后点击保存。", false);
 }
@@ -504,22 +633,9 @@ async function savePrompts() {
 
 async function saveContentModules() {
   clearMessage();
-  const modules = [...document.querySelectorAll(".content-module-card")].map((card) => ({
-    id: card.querySelector(".module-id").value.trim(),
-    enabled: card.querySelector(".module-enabled").checked,
-    name: card.querySelector(".module-name").value.trim(),
-    templateId: card.querySelector(".module-template").value,
-    llmPresetId: card.querySelector(".module-llm-preset").value,
-    voiceId: card.querySelector(".module-voice").value,
-    promptSetId: card.querySelector(".module-prompt-set").value,
-    frontTitle: card.querySelector(".module-front-title").value.trim(),
-    frontSubtitle: card.querySelector(".module-front-subtitle").value.trim(),
-    description: card.querySelector(".module-description").value.trim(),
-    defaultText: card.querySelector(".module-default-text").value.trim(),
-    prompt: card.querySelector(".module-prompt").value.trim(),
-    promptSets: updatePromptSetsFromCard(card)
-  }));
-  const activeModuleId = document.querySelector('input[name="activeContentModule"]:checked')?.value;
+  persistCurrentContentModuleEdits();
+  const modules = settings.contentModules ?? [];
+  const activeModuleId = settings.activeContentModuleId || modules[0]?.id;
 
   try {
     settings = await fetchJson("/api/admin/content-modules", {
@@ -534,14 +650,47 @@ async function saveContentModules() {
   }
 }
 
-function updatePromptSetsFromCard(card) {
+function persistCurrentContentModuleEdits(promptSetIdOverride) {
+  const card = elements.contentModuleList.querySelector(".content-module-card");
+  if (!card || !settings?.contentModules) {
+    return;
+  }
+
+  const moduleId = card.querySelector(".module-id").value.trim();
+  const moduleIndex = settings.contentModules.findIndex((item) => item.id === moduleId);
+  if (moduleIndex === -1) {
+    return;
+  }
+
+  const selectedPromptSetId = card.querySelector(".module-prompt-set")?.value;
+  const currentModule = settings.contentModules[moduleIndex];
+  settings.contentModules[moduleIndex] = {
+    ...currentModule,
+    id: moduleId,
+    enabled: card.querySelector(".module-enabled").checked,
+    name: card.querySelector(".module-name").value.trim(),
+    templateId: card.querySelector(".module-template").value,
+    llmPresetId: card.querySelector(".module-llm-preset").value,
+    voiceId: card.querySelector(".module-voice").value,
+    promptSetId: selectedPromptSetId,
+    frontTitle: card.querySelector(".module-front-title").value.trim(),
+    frontSubtitle: card.querySelector(".module-front-subtitle").value.trim(),
+    description: card.querySelector(".module-description").value.trim(),
+    defaultText: card.querySelector(".module-default-text").value.trim(),
+    prompt: card.querySelector(".module-prompt").value.trim(),
+    promptSets: updatePromptSetsFromCard(card, promptSetIdOverride)
+  };
+}
+
+function updatePromptSetsFromCard(card, promptSetIdOverride) {
   const selectedPromptSetId = card.querySelector(".module-prompt-set").value;
+  const promptSetIdToUpdate = promptSetIdOverride || selectedPromptSetId;
   const moduleId = card.querySelector(".module-id").value.trim();
   const module = (settings.contentModules ?? []).find((item) => item.id === moduleId);
   const promptSets = module?.promptSets?.length ? module.promptSets : createDefaultPromptSets(card.querySelector(".module-name").value.trim());
 
   return promptSets.map((promptSet) =>
-    promptSet.id === selectedPromptSetId
+    promptSet.id === promptSetIdToUpdate
       ? {
           ...promptSet,
           scriptPrompt: card.querySelector(".module-script-prompt").value.trim(),
